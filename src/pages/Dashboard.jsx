@@ -1,0 +1,195 @@
+/*
+  Dashboard.jsx — Home screen
+  Shows: greeting, today's stats, wholesaler alerts, low stock, recent sales
+  Data comes from Firebase via useApp() context (updates in real time)
+*/
+
+import React, { useMemo } from 'react'
+import { useApp } from '../App'
+import { formatStock, stockStatus } from '../firebase'
+import { Link } from 'react-router-dom'
+
+export default function Dashboard() {
+  const { products, wholesalers, todaySales } = useApp()
+
+  // ── Computed stats (recalculated when data changes) ──
+  const stats = useMemo(() => {
+    const low     = products.filter(p => stockStatus(p) === 'low')
+    const out     = products.filter(p => stockStatus(p) === 'out')
+    const revenue = todaySales.reduce((s, x) => s + parseFloat(x.total || 0), 0)
+    const discountGiven = todaySales.reduce((s, x) => s + parseFloat(x.discountAmt || 0), 0)
+    return { low, out, revenue, discountGiven }
+  }, [products, todaySales])
+
+  // ── Wholesalers due today ──
+  const dueToday = useMemo(() => {
+    const today = new Date()
+    return wholesalers.filter(w =>
+      (w.scheduleType === 'weekly'  && parseInt(w.payDay)  === today.getDay()) ||
+      (w.scheduleType === 'monthly' && parseInt(w.payDate) === today.getDate())
+    )
+  }, [wholesalers])
+
+  // ── Greeting based on time ──
+  const hour     = new Date().getHours()
+  const greeting = hour < 12 ? '🌅 Good Morning' : hour < 17 ? '☀️ Good Afternoon' : '🌙 Good Evening'
+  const today    = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  return (
+    <div className="page-enter">
+
+      {/* ── TOP HEADER ── */}
+      <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white px-5 pt-12 pb-8">
+        <p className="text-blue-200 text-sm font-medium">{today}</p>
+        <h1 className="text-2xl font-extrabold mt-1">{greeting}! 👋</h1>
+        <p className="text-blue-200 text-sm mt-1">Here's your shop overview</p>
+      </div>
+
+      <div className="px-4 -mt-4 space-y-4 pb-4">
+
+        {/* ── WHOLESALER ALERTS ── */}
+        {dueToday.map(w => (
+          <div key={w.id} className="bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-3">
+            <span className="text-xl">🔔</span>
+            <div>
+              <p className="font-bold text-red-800 text-sm">Payment Due Today!</p>
+              <p className="text-red-700 text-sm mt-0.5">
+                {w.name} — ₹{parseFloat(w.amount || 0).toLocaleString()}
+                {w.phone && <span> · 📞 {w.phone}</span>}
+              </p>
+            </div>
+          </div>
+        ))}
+
+        {/* ── STAT CARDS ── */}
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard color="blue"  icon="💊" num={products.length}      label="Total Products" sub="कुल उत्पाद" />
+          <StatCard color="amber" icon="⚠️" num={stats.low.length}     label="Low Stock"      sub="कम स्टॉक" />
+          <StatCard color="red"   icon="🚫" num={stats.out.length}      label="Out of Stock"   sub="स्टॉक खत्म" />
+          <StatCard color="green" icon="🧾" num={todaySales.length}     label="Today's Sales"  sub="आज की बिक्री" />
+        </div>
+
+        {/* ── REVENUE CARD ── */}
+        <div className="bg-slate-900 rounded-2xl p-5 flex justify-between items-center">
+          <div>
+            <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+              Today's Revenue / आज की कमाई
+            </p>
+            <p className="text-3xl font-extrabold text-white mt-1">
+              ₹{stats.revenue.toLocaleString()}
+            </p>
+            {stats.discountGiven > 0 && (
+              <p className="text-green-400 text-xs mt-1">
+                💝 ₹{stats.discountGiven.toFixed(0)} discount given
+              </p>
+            )}
+          </div>
+          <span className="text-4xl opacity-30">💰</span>
+        </div>
+
+        {/* ── LOW STOCK LIST ── */}
+        <Section title="⚠️ Low Stock Alert" sub="कम स्टॉक" link="/products">
+          {stats.low.length === 0 && stats.out.length === 0 ? (
+            <Empty icon="✅" text="All stocks are sufficient!" />
+          ) : (
+            [...stats.out, ...stats.low].slice(0, 5).map(p => (
+              <ProductRow key={p.id} product={p} />
+            ))
+          )}
+        </Section>
+
+        {/* ── RECENT SALES ── */}
+        <Section title="🧾 Recent Sales" sub="हाल की बिक्री" link="/reports">
+          {todaySales.length === 0 ? (
+            <Empty icon="🛒" text="No sales recorded today" />
+          ) : (
+            todaySales.slice(0, 5).map(s => (
+              <SaleRow key={s.id} sale={s} />
+            ))
+          )}
+        </Section>
+
+      </div>
+    </div>
+  )
+}
+
+// ── SUB-COMPONENTS ──
+
+function StatCard({ color, icon, num, label, sub }) {
+  const colors = {
+    blue:  'from-blue-500  to-blue-600',
+    amber: 'from-amber-500 to-amber-600',
+    red:   'from-red-500   to-red-600',
+    green: 'from-green-500 to-green-600',
+  }
+  return (
+    <div className={`bg-gradient-to-br ${colors[color]} rounded-2xl p-4 text-white`}>
+      <div className="flex justify-between items-start mb-2">
+        <span className="text-xs font-semibold opacity-80">{label}</span>
+        <span className="text-lg">{icon}</span>
+      </div>
+      <div className="text-3xl font-extrabold leading-none">{num}</div>
+      <div className="text-xs opacity-70 mt-1">{sub}</div>
+    </div>
+  )
+}
+
+function Section({ title, sub, link, children }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100">
+        <div>
+          <p className="font-bold text-sm text-slate-800">{title}</p>
+          <p className="text-xs text-slate-400">{sub}</p>
+        </div>
+        <Link to={link} className="text-xs text-blue-600 font-semibold">See all →</Link>
+      </div>
+      <div className="divide-y divide-slate-50">{children}</div>
+    </div>
+  )
+}
+
+function ProductRow({ product }) {
+  const isOut = stockStatus(product) === 'out'
+  return (
+    <div className="flex items-center justify-between px-4 py-3">
+      <div>
+        <p className="font-semibold text-sm text-slate-800">{product.name}</p>
+        <p className="text-xs text-slate-400">{product.category}</p>
+      </div>
+      <span className={`text-xs font-bold px-2.5 py-1 rounded-full
+        ${isOut ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+        {isOut ? '🚫 Out' : `⚠️ ${formatStock(product)}`}
+      </span>
+    </div>
+  )
+}
+
+function SaleRow({ sale }) {
+  return (
+    <div className="flex justify-between items-start px-4 py-3">
+      <div>
+        <p className="font-semibold text-sm text-slate-800">{sale.customer || 'Customer'}</p>
+        <p className="text-xs text-slate-400 mt-0.5">
+          {(sale.items || []).map(i => `${i.name} ×${i.qty}`).join(', ')}
+        </p>
+      </div>
+      <div className="text-right">
+        <p className="font-bold text-blue-600 text-sm">₹{sale.total}</p>
+        {parseFloat(sale.discountAmt) > 0 && (
+          <p className="text-xs text-green-600">−₹{parseFloat(sale.discountAmt).toFixed(0)}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Empty({ icon, text }) {
+  return (
+    <div className="text-center py-8 text-slate-400">
+      <div className="text-3xl mb-2">{icon}</div>
+      <p className="text-sm">{text}</p>
+    </div>
+  )
+}

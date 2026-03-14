@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo, useRef } from 'react'
 import { useApp, useToast } from '../App'
-import { addProduct, updateProduct, deleteProduct, formatStock, stockStatus } from '../firebase'
+import { addProduct, updateProduct, deleteProduct, formatStock, stockStatus, expiryStatus, daysUntilExpiry } from '../firebase'
 import Modal from '../components/Modal'
 import StockBadge from '../components/StockBadge'
 
@@ -13,8 +13,9 @@ import StockBadge from '../components/StockBadge'
 const EMPTY_FORM = {
   name: '', category: 'Tablet / गोली', unit: 'tablet',
   perStrip: '', stripsToAdd: '', stock: '',
-  lowAlert: '', buyPrice: '', sellPrice: '',
-  wholesalerId: '', wholesalerName: '',
+  lowAlert: '', buyPrice: '', sellPrice: '', expiryDate: '',
+  wholesalerId: '', wholesalerName: '', expiryDate: '',
+  expiryDate: '',
 }
 
 export default function Products() {
@@ -69,6 +70,8 @@ export default function Products() {
       buyPrice:        product.buyPrice     || '',
       sellPrice:       product.sellPrice    || '',
       wholesalerId:    product.wholesalerId || '',
+      expiryDate:      product.expiryDate || '',
+      expiryDate:      product.expiryDate    || '',
       wholesalerName:  product.wholesalerName || '',
     })
     setEditId(product.id)
@@ -133,7 +136,9 @@ export default function Products() {
         buyPrice:       parseFloat(form.buyPrice)  || 0,
         sellPrice:      parseFloat(form.sellPrice) || 0,
         wholesalerId:   form.wholesalerId  || '',
+        expiryDate:     form.expiryDate || '',
         wholesalerName: w ? w.name : '',
+        expiryDate:     form.expiryDate || '',
       }
 
       if (editId) {
@@ -408,6 +413,15 @@ export default function Products() {
             </div>
           </div>
 
+          {/* EXPIRY DATE */}
+          <div>
+            <label className="field-label">Expiry Date / समाप्ति तिथि</label>
+            <input type="month" id="pExpiryDate" value={form.expiryDate}
+              onChange={e => setForm({...form, expiryDate: e.target.value})}
+              className="field-input" />
+            <p className="text-xs text-slate-400 mt-1">Leave blank if no expiry</p>
+          </div>
+
           {/* WHOLESALER */}
           <div>
             <label className="field-label">Wholesaler</label>
@@ -419,6 +433,15 @@ export default function Products() {
             </select>
           </div>
 
+          {/* EXPIRY DATE */}
+          <div>
+            <label className="field-label">Expiry Date / एक्सपायरी डेट</label>
+            <input type="month" value={form.expiryDate}
+              onChange={e => setForm({...form, expiryDate: e.target.value})}
+              className="field-input" id="pExpiry"/>
+            <p className="text-xs text-slate-400 mt-1">Leave empty if not applicable</p>
+          </div>
+
           {/* SAVE BUTTON */}
           <button
             onClick={handleSave}
@@ -426,7 +449,21 @@ export default function Products() {
             className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl
                        disabled:opacity-50 transition-all active:scale-[0.98]"
           >
-            {saving ? '⏳ Saving...' : '💾 Save Product'}
+            
+          {/* EXPIRY DATE */}
+          <div>
+            <label className="field-label">Expiry Date / एक्सपायरी तारीख</label>
+            <input
+              type="month"
+              value={form.expiryDate}
+              onChange={e => setForm({...form, expiryDate: e.target.value})}
+              className="field-input"
+            />
+            <p className="text-xs text-slate-400 mt-1">Leave blank if no expiry date</p>
+          </div>
+
+          {/* SAVE BUTTON */}
+          {saving ? '⏳ Saving...' : '💾 Save Product'}
           </button>
         </div>
       </Modal>

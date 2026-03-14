@@ -1,11 +1,7 @@
 /*
   firebase.js — Database connection, auth & helpers
   
-  SECURITY:
-  - Uses Firebase Anonymous Auth
-  - Workers enter a shop PIN → app signs them in anonymously
-  - Firestore rules only allow signed-in users
-  - Strangers on internet cannot access your data
+  UPDATED: Added udhaar (credit) collection
 */
 
 import { initializeApp }          from 'firebase/app'
@@ -17,7 +13,6 @@ import { getFirestore, collection, doc,
 import { getAuth, signInAnonymously,
          onAuthStateChanged }     from 'firebase/auth'
 
-// YOUR FIREBASE CONFIG
 const firebaseConfig = {
   apiKey:            "AIzaSyCL4p8k03mrd_nMFaGhE0WegSYImPA-5qQ",
   authDomain:        "medical-shop-f7f0d.firebaseapp.com",
@@ -28,112 +23,65 @@ const firebaseConfig = {
   measurementId:     "G-7QJTRRTBL1"
 }
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig)
-
-// Firestore database
 export const db   = getFirestore(app)
-
-// Firebase Auth
 export const auth = getAuth(app)
 
-// ─────────────────────────────────────────────────────
-// SHOP PIN — change this to your own secret PIN!
-// Tell this PIN to your workers only.
-// ─────────────────────────────────────────────────────
+// ── Shop PIN ──
 export const SHOP_PIN = '1234'
 
-// Sign in anonymously (called after PIN is verified)
-// This creates a temporary anonymous user in Firebase
-// Firestore rules check this user exists before allowing access
+// ── Auth helpers ──
 export const signInToShop = () => signInAnonymously(auth)
+export const onAuthChange = (cb) => onAuthStateChanged(auth, cb)
+export const signOut      = () => auth.signOut()
 
-// Listen to auth state changes
-// callback(user) — user is null if not logged in
-export const onAuthChange = (callback) => onAuthStateChanged(auth, callback)
-
-// Sign out
-export const signOut = () => auth.signOut()
-
-
-// ─────────────────────────────────────────────────────
-// COLLECTION REFERENCES
-// ─────────────────────────────────────────────────────
+// ── Collections ──
 export const productsCol    = collection(db, 'products')
 export const salesCol       = collection(db, 'sales')
 export const wholesalersCol = collection(db, 'wholesalers')
+export const udhaarCol      = collection(db, 'udhaar')  // NEW: credit tracker
 
+// ── Products ──
+export const addProduct    = (data) => addDoc(productsCol, { ...data, createdAt: serverTimestamp() })
+export const updateProduct = (id, data) => updateDoc(doc(db, 'products', id), { ...data, updatedAt: serverTimestamp() })
+export const deleteProduct = (id) => deleteDoc(doc(db, 'products', id))
+export const listenProducts = (cb) =>
+  onSnapshot(query(productsCol, orderBy('createdAt', 'desc')), snap =>
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
 
-// ─────────────────────────────────────────────────────
-// PRODUCTS
-// ─────────────────────────────────────────────────────
-export const addProduct = (data) =>
-  addDoc(productsCol, { ...data, createdAt: serverTimestamp() })
-
-export const updateProduct = (id, data) =>
-  updateDoc(doc(db, 'products', id), { ...data, updatedAt: serverTimestamp() })
-
-export const deleteProduct = (id) =>
-  deleteDoc(doc(db, 'products', id))
-
-export const listenProducts = (callback) =>
-  onSnapshot(
-    query(productsCol, orderBy('createdAt', 'desc')),
-    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  )
-
-
-// ─────────────────────────────────────────────────────
-// SALES
-// ─────────────────────────────────────────────────────
-export const addSale = (data) =>
-  addDoc(salesCol, { ...data, createdAt: serverTimestamp() })
-
-export const listenTodaySales = (callback) => {
-  const startOfDay = new Date()
-  startOfDay.setHours(0, 0, 0, 0)
+// ── Sales ──
+export const addSale = (data) => addDoc(salesCol, { ...data, createdAt: serverTimestamp() })
+export const listenTodaySales = (cb) => {
+  const start = new Date(); start.setHours(0,0,0,0)
   return onSnapshot(
-    query(salesCol, where('createdAt', '>=', startOfDay), orderBy('createdAt', 'desc')),
-    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  )
+    query(salesCol, where('createdAt', '>=', start), orderBy('createdAt', 'desc')),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
 }
+export const listenAllSales = (cb) =>
+  onSnapshot(query(salesCol, orderBy('createdAt', 'desc')), snap =>
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
 
-export const listenAllSales = (callback) =>
-  onSnapshot(
-    query(salesCol, orderBy('createdAt', 'desc')),
-    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  )
+// ── Wholesalers ──
+export const addWholesaler    = (data) => addDoc(wholesalersCol, { ...data, createdAt: serverTimestamp() })
+export const updateWholesaler = (id, data) => updateDoc(doc(db, 'wholesalers', id), data)
+export const deleteWholesaler = (id) => deleteDoc(doc(db, 'wholesalers', id))
+export const listenWholesalers = (cb) =>
+  onSnapshot(query(wholesalersCol, orderBy('createdAt', 'desc')), snap =>
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
 
+// ── Udhaar (Credit) ──
+export const addUdhaar    = (data) => addDoc(udhaarCol, { ...data, createdAt: serverTimestamp(), paid: false })
+export const updateUdhaar = (id, data) => updateDoc(doc(db, 'udhaar', id), data)
+export const deleteUdhaar = (id) => deleteDoc(doc(db, 'udhaar', id))
+export const listenUdhaar = (cb) =>
+  onSnapshot(query(udhaarCol, orderBy('createdAt', 'desc')), snap =>
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
 
-// ─────────────────────────────────────────────────────
-// WHOLESALERS
-// ─────────────────────────────────────────────────────
-export const addWholesaler    = (data) =>
-  addDoc(wholesalersCol, { ...data, createdAt: serverTimestamp() })
-
-export const updateWholesaler = (id, data) =>
-  updateDoc(doc(db, 'wholesalers', id), data)
-
-export const deleteWholesaler = (id) =>
-  deleteDoc(doc(db, 'wholesalers', id))
-
-export const listenWholesalers = (callback) =>
-  onSnapshot(
-    query(wholesalersCol, orderBy('createdAt', 'desc')),
-    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  )
-
-
-// ─────────────────────────────────────────────────────
-// STOCK HELPERS
-// ─────────────────────────────────────────────────────
-
-// Format stock as "4 strips + 7 tablets"
+// ── Stock helpers ──
 export const formatStock = (product) => {
   const isTablet = product.unit === 'tablet' || product.unit === 'capsule'
-  if (!isTablet || !product.perStrip || product.perStrip <= 1) {
+  if (!isTablet || !product.perStrip || product.perStrip <= 1)
     return `${product.stock ?? 0} ${product.unit}(s)`
-  }
   const strips   = Math.floor((product.stock ?? 0) / product.perStrip)
   const leftover = (product.stock ?? 0) % product.perStrip
   const parts    = []
@@ -142,9 +90,56 @@ export const formatStock = (product) => {
   return parts.length ? parts.join(' + ') : '0 tablets'
 }
 
-// Get stock status: 'out' | 'low' | 'ok'
 export const stockStatus = (product) => {
   if ((product.stock ?? 0) <= 0) return 'out'
   if ((product.stock ?? 0) <= (product.lowAlert ?? 10)) return 'low'
   return 'ok'
+}
+
+// ── Expiry helpers ──
+// Returns 'expired' | 'soon' (within 30 days) | 'ok' | null (no expiry set)
+export const expiryStatus = (product) => {
+  if (!product.expiryDate) return null
+  const today  = new Date()
+  const expiry = new Date(product.expiryDate)
+  const days   = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
+  if (days <= 0)  return 'expired'
+  if (days <= 30) return 'soon'
+  return 'ok'
+}
+
+// Returns days until expiry (negative if expired)
+export const daysUntilExpiry = (product) => {
+  if (!product.expiryDate) return null
+  const today  = new Date()
+  const expiry = new Date(product.expiryDate)
+  return Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
+}
+
+// ── WhatsApp bill helper ──
+// Generates a WhatsApp message with bill details
+export const generateWhatsAppBill = (sale) => {
+  const date  = sale.createdAt?.toDate?.() || new Date(sale.date || sale.createdAt)
+  const items = (sale.items || []).map(i =>
+    `  • ${i.name} x${i.qty} = Rs.${(i.qty * i.price).toFixed(0)}`
+  ).join('\n')
+
+  let msg = `*Sarvesh Medicals* 💊\n`
+  msg += `_Medical Shop, Maheshwar_\n`
+  msg += `─────────────────\n`
+  msg += `📅 ${date.toLocaleDateString('en-IN')}\n`
+  msg += `👤 ${sale.customer || 'Customer'}\n`
+  msg += `─────────────────\n`
+  msg += `*Items:*\n${items}\n`
+  msg += `─────────────────\n`
+  if (parseFloat(sale.discountAmt) > 0) {
+    msg += `Subtotal: Rs.${parseFloat(sale.subtotal).toFixed(0)}\n`
+    msg += `Discount: -Rs.${parseFloat(sale.discountAmt).toFixed(0)}\n`
+  }
+  msg += `*Total: Rs.${sale.total}*\n`
+  if (sale.paymentMethod) msg += `Payment: ${sale.paymentMethod}\n`
+  msg += `─────────────────\n`
+  msg += `Thank you! 🙏`
+
+  return encodeURIComponent(msg)
 }

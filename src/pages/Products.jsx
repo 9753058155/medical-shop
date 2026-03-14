@@ -13,9 +13,8 @@ import StockBadge from '../components/StockBadge'
 const EMPTY_FORM = {
   name: '', category: 'Tablet / गोली', unit: 'tablet',
   perStrip: '', stripsToAdd: '', stock: '',
-  lowAlert: '', buyPrice: '', sellPrice: '', expiryDate: '',
+  lowAlert: '', buyPrice: '', sellPrice: '',
   wholesalerId: '', wholesalerName: '', expiryDate: '',
-  expiryDate: '',
 }
 
 export default function Products() {

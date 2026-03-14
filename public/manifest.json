@@ -1,26 +1,29 @@
 {
   "name": "Sarvesh Medicals",
-  "short_name": "MedShop",
-  "description": "Medical Shop Manager - Stock, Sales & Wholesalers",
+  "short_name": "Sarvesh",
+  "description": "Medical Shop Manager",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1e3a8a",
-  "theme_color": "#2563eb",
+  "theme_color": "#1e3a8a",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
-  ],
-  "categories": ["business", "productivity"],
-  "lang": "en-IN"
+  ]
 }

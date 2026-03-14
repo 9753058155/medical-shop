@@ -9,7 +9,7 @@ import { formatStock, stockStatus, expiryStatus, daysUntilExpiry } from '../fire
 import { Link }            from 'react-router-dom'
 
 export default function Dashboard() {
-  const { products, wholesalers, todaySales, udhaarList } = useApp()
+  const { products, wholesalers, todaySales, udhaarList = [] } = useApp()
 
   const stats = useMemo(() => {
     const low     = products.filter(p => stockStatus(p) === 'low')

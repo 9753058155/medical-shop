@@ -55,6 +55,7 @@ export default function App() {
       if (user) {
         const lastActive = parseInt(localStorage.getItem(STORAGE_KEY) || '0')
         if (Date.now() - lastActive > INACTIVITY_LIMIT) {
+          // Inactivity timeout — force logout
           await signOut()
           localStorage.removeItem(STORAGE_KEY)
           setAuthed(false)
@@ -67,6 +68,31 @@ export default function App() {
       }
     })
     return () => unsub()
+  }, [])
+
+  // ── Sign out when app is closed or tab hidden ──
+  // This forces PIN entry every time the app is reopened
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'hidden') {
+        // App going to background or tab closed
+        await signOut()
+        localStorage.removeItem(STORAGE_KEY)
+      }
+    }
+
+    const handleBeforeUnload = async () => {
+      // Page closing / refreshing
+      await signOut()
+      localStorage.removeItem(STORAGE_KEY)
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
   }, [])
 
   // ── Track activity for auto-logout ──

@@ -58,10 +58,20 @@ export default function App() {
     const unsub = onAuthChange(async user => {
       if (user) {
         const lastActive = parseInt(localStorage.getItem(STORAGE_KEY) || '0')
-        if (Date.now() - lastActive > INACTIVITY_LIMIT) {
-          await signOut(); localStorage.removeItem(STORAGE_KEY); setAuthed(false)
-        } else { setAuthed(true); resetInactivityTimer() }
-      } else { setAuthed(false) }
+        if (lastActive && Date.now() - lastActive > INACTIVITY_LIMIT) {
+          // Session expired — sign out and show PIN
+          await signOut()
+          localStorage.removeItem(STORAGE_KEY)
+          setAuthed(false)
+        } else {
+          // Valid session — show app
+          setAuthed(true)
+          resetInactivityTimer()
+        }
+      } else {
+        // No user and no valid session — show PIN
+        setAuthed(false)
+      }
     })
     return () => unsub()
   }, [])
@@ -104,9 +114,12 @@ export default function App() {
   }
 
   function handlePinSuccess() {
-    setCovering(true)
+    // Save timestamp FIRST — before anything else
+    // This ensures onAuthChange sees a valid session if it fires during transition
     localStorage.setItem(STORAGE_KEY, Date.now().toString())
-    setTimeout(() => { setAuthed(true); setTimeout(() => setCovering(false), 600) }, 100)
+    setCovering(true)
+    setAuthed(true)
+    setTimeout(() => setCovering(false), 800)
   }
 
   if (covering || authed === null) return <SplashScreen />

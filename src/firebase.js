@@ -34,28 +34,41 @@ export const SHOP_PIN = '1234'
 export const signInToShop = () => signInAnonymously(auth)
 export const signOut      = () => auth.signOut()
 
-// Auto re-authenticate when token expires — permanent fix for permission errors
-// Firebase anonymous auth tokens expire every hour. This silently refreshes them.
+// onAuthChange — wraps Firebase auth state with silent re-auth
+// KEY FIX: When user = null but session is still valid, we silently
+// re-authenticate WITHOUT calling cb(null) — this prevents the PIN
+// screen from flashing when the auth token refreshes.
 export const onAuthChange = (cb) => {
+  let silentlyReAuthing = false
+
   return onAuthStateChanged(auth, async (user) => {
+    if (silentlyReAuthing) return  // ignore intermediate null state
+
     if (!user) {
-      // User got signed out (token expired, app restarted, etc.)
-      // Check if they were previously PIN-verified — if yes, silently re-auth
-      const wasVerified = localStorage.getItem('ms_last_active')
-      const lastActive  = parseInt(wasVerified || '0')
-      const eightHours  = 8 * 60 * 60 * 1000
-      if (wasVerified && Date.now() - lastActive < eightHours) {
-        // Still within session — silently sign back in
+      const lastActive = parseInt(localStorage.getItem('ms_last_active') || '0')
+      const eightHours = 8 * 60 * 60 * 1000
+
+      if (lastActive && Date.now() - lastActive < eightHours) {
+        // Session still valid — silently re-auth, DON'T show PIN screen
+        silentlyReAuthing = true
         try {
           await signInAnonymously(auth)
-          // onAuthStateChanged will fire again with the new user
-          return
+          // onAuthStateChanged will fire again with the new user — handled below
         } catch (e) {
           console.error('Auto re-auth failed:', e)
+          silentlyReAuthing = false
+          cb(null)  // truly failed — show PIN
         }
+        return
       }
+      // No valid session — show PIN screen
+      silentlyReAuthing = false
+      cb(null)
+    } else {
+      // Got a valid user (either fresh login or after silent re-auth)
+      silentlyReAuthing = false
+      cb(user)
     }
-    cb(user)
   })
 }
 

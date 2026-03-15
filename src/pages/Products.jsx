@@ -70,7 +70,6 @@ export default function Products() {
       sellPrice:       product.sellPrice    || '',
       wholesalerId:    product.wholesalerId || '',
       expiryDate:      product.expiryDate || '',
-      expiryDate:      product.expiryDate    || '',
       wholesalerName:  product.wholesalerName || '',
     })
     setEditId(product.id)
@@ -135,7 +134,6 @@ export default function Products() {
         buyPrice:       parseFloat(form.buyPrice)  || 0,
         sellPrice:      parseFloat(form.sellPrice) || 0,
         wholesalerId:   form.wholesalerId  || '',
-        expiryDate:     form.expiryDate || '',
         wholesalerName: w ? w.name : '',
         expiryDate:     form.expiryDate || '',
       }
@@ -412,13 +410,63 @@ export default function Products() {
             </div>
           </div>
 
-          {/* EXPIRY DATE */}
+
+          {/* EXPIRY DATE
+              Two dropdowns: Month + Year
+              Works perfectly on iPhone 15 — no distortion.
+              Month is a <select>, Year is a number input.
+              Stored as "MM/YYYY" string e.g. "03/2026"
+          */}
           <div>
-            <label className="field-label">Expiry Date / समाप्ति तिथि</label>
-            <input type="month" id="pExpiryDate" value={form.expiryDate}
-              onChange={e => setForm({...form, expiryDate: e.target.value})}
-              className="field-input" />
-            <p className="text-xs text-slate-400 mt-1">Leave blank if no expiry</p>
+            <label className="field-label">
+              Expiry Date / समाप्ति तिथि
+            </label>
+            <div style={{display:'flex', gap:'8px'}}>
+
+              {/* Month dropdown — clean native picker on all devices */}
+              <select
+                value={form.expiryDate ? (form.expiryDate.split('/')[0] || '') : ''}
+                onChange={e => {
+                  const month = e.target.value
+                  const year  = form.expiryDate ? (form.expiryDate.split('/')[1] || '') : ''
+                  setForm({...form, expiryDate: month || year ? `${month}/${year}` : ''})
+                }}
+                className="field-input"
+                style={{flex: 1}}
+              >
+                <option value="">Month</option>
+                <option value="01">01 - Jan</option>
+                <option value="02">02 - Feb</option>
+                <option value="03">03 - Mar</option>
+                <option value="04">04 - Apr</option>
+                <option value="05">05 - May</option>
+                <option value="06">06 - Jun</option>
+                <option value="07">07 - Jul</option>
+                <option value="08">08 - Aug</option>
+                <option value="09">09 - Sep</option>
+                <option value="10">10 - Oct</option>
+                <option value="11">11 - Nov</option>
+                <option value="12">12 - Dec</option>
+              </select>
+
+              {/* Year input — numeric keyboard on mobile */}
+              <input
+                type="number"
+                value={form.expiryDate ? (form.expiryDate.split('/')[1] || '') : ''}
+                onChange={e => {
+                  const year  = e.target.value.replace(/\D/g,'').slice(0,4)
+                  const month = form.expiryDate ? (form.expiryDate.split('/')[0] || '') : ''
+                  setForm({...form, expiryDate: `${month}/${year}`})
+                }}
+                placeholder="2026"
+                inputMode="numeric"
+                className="field-input"
+                style={{flex: 1}}
+              />
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Leave blank if no expiry date
+            </p>
           </div>
 
           {/* WHOLESALER */}
@@ -430,35 +478,6 @@ export default function Products() {
               <option value="">-- Select --</option>
               {wholesalers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
-          </div>
-
-          {/* EXPIRY DATE */}
-          <div>
-            <label className="field-label">Expiry Date / एक्सपायरी डेट</label>
-            <input type="month" value={form.expiryDate}
-              onChange={e => setForm({...form, expiryDate: e.target.value})}
-              className="field-input" id="pExpiry"/>
-            <p className="text-xs text-slate-400 mt-1">Leave empty if not applicable</p>
-          </div>
-
-          {/* SAVE BUTTON */}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl
-                       disabled:opacity-50 transition-all active:scale-[0.98]"
-          >
-            
-          {/* EXPIRY DATE */}
-          <div>
-            <label className="field-label">Expiry Date / एक्सपायरी तारीख</label>
-            <input
-              type="month"
-              value={form.expiryDate}
-              onChange={e => setForm({...form, expiryDate: e.target.value})}
-              className="field-input"
-            />
-            <p className="text-xs text-slate-400 mt-1">Leave blank if no expiry date</p>
           </div>
 
           {/* SAVE BUTTON */}

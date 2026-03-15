@@ -17,6 +17,8 @@ import { addSale, addUdhaar, db,
 import { doc, getDoc, updateDoc,
          writeBatch, deleteDoc }            from 'firebase/firestore'
 import Modal                                from '../components/Modal'
+import PhoneInput                           from '../components/PhoneInput'
+import { useLanguage, validatePhone }       from '../i18n'
 
 const emptyRow = () => ({ id: Date.now() + Math.random(), productId: '', qty: 1 })
 
@@ -46,6 +48,7 @@ function openWhatsAppBill(sale, phone = '') {
 export default function Sell() {
   const { products, todaySales } = useApp()
   const showToast = useToast()
+  const { t, lang } = useLanguage()
 
   const [workerName,   setWorkerName]   = useState('')
   const [customer,     setCustomer]     = useState('')
@@ -105,7 +108,9 @@ export default function Sell() {
   async function completeSale() {
     const validRows = rows.filter(r => r.productId && parseFloat(r.qty) > 0)
     if (validRows.length === 0) { showToast('Add at least one item', 'warning'); return }
-    if (!workerName.trim())     { showToast('Enter worker name', 'warning'); return }
+    if (!workerName.trim()) { showToast('Enter worker name', 'warning'); return }
+    const phoneCheck = validatePhone(customerPhone)
+    if (customerPhone && !phoneCheck.valid) { showToast('Invalid customer phone number', 'error'); return }
 
     for (const row of validRows) {
       const p = products.find(x => x.id === row.productId)
@@ -272,8 +277,8 @@ export default function Sell() {
     <div className="page-enter">
 
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white px-5 pt-12 pb-6">
-        <h1 className="text-2xl font-extrabold">New Sale</h1>
-        <p className="text-blue-200 text-sm mt-1">बिक्री दर्ज करें</p>
+        <h1 className="text-2xl font-extrabold">{t('newSale')}</h1>
+        <p className="text-blue-200 text-sm mt-1">{lang === 'hi' ? 'बिक्री दर्ज करें' : 'Record a sale'}</p>
       </div>
 
       <div className="px-4 pt-4 space-y-4">
@@ -294,9 +299,12 @@ export default function Sell() {
                 placeholder="Name..." className="field-input"/>
             </div>
             <div>
-              <label className="field-label">Phone (WhatsApp)</label>
-              <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-                placeholder="98765..." className="field-input"/>
+              <PhoneInput
+                value={customerPhone}
+                onChange={setCustomerPhone}
+                label="Phone (WhatsApp)"
+                placeholder="98765..."
+              />
             </div>
           </div>
 

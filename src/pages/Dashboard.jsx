@@ -5,11 +5,13 @@
 
 import React, { useMemo } from 'react'
 import { useApp }          from '../App'
+import { useLanguage }     from '../i18n'
 import { formatStock, stockStatus, expiryStatus, daysUntilExpiry } from '../firebase'
 import { Link }            from 'react-router-dom'
 
 export default function Dashboard() {
   const { products, wholesalers, todaySales, udhaarList = [] } = useApp()
+  const { t, lang } = useLanguage()
 
   const stats = useMemo(() => {
     const low     = products.filter(p => stockStatus(p) === 'low')
@@ -32,7 +34,7 @@ export default function Dashboard() {
   }, [wholesalers])
 
   const hour     = new Date().getHours()
-  const greeting = hour < 12 ? '🌅 Good Morning' : hour < 17 ? '☀️ Good Afternoon' : '🌙 Good Evening'
+  const greeting = hour < 12 ? `🌅 ${t('goodMorning')}` : hour < 17 ? `☀️ ${t('goodAfternoon')}` : `🌙 ${t('goodEvening')}`
   const today    = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' })
 
   return (
@@ -107,10 +109,10 @@ export default function Dashboard() {
 
         {/* ── STAT CARDS ── */}
         <div className="grid grid-cols-2 gap-3">
-          <StatCard color="blue"  icon="💊" num={products.length}      label="Total Products" sub="कुल उत्पाद"/>
-          <StatCard color="amber" icon="⚠️" num={stats.low.length}     label="Low Stock"      sub="कम स्टॉक"/>
+          <StatCard color="blue"  icon="💊" num={products.length}      label={t('totalProducts')} sub="कुल उत्पाद"/>
+          <StatCard color="amber" icon="⚠️" num={stats.low.length}     label={t('lowStock')} sub="कम स्टॉक"/>
           <StatCard color="red"   icon="🚫" num={stats.out.length}      label="Out of Stock"   sub="खत्म"/>
-          <StatCard color="green" icon="🧾" num={todaySales.length}     label="Today's Sales"  sub="आज की बिक्री"/>
+          <StatCard color="green" icon="🧾" num={todaySales.length}     label={t('todaySales')} sub="आज की बिक्री"/>
         </div>
 
         {/* ── REVENUE ── */}

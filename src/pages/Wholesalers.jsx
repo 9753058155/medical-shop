@@ -7,6 +7,8 @@ import React, { useState } from 'react'
 import { useApp, useToast } from '../App'
 import { addWholesaler, updateWholesaler, deleteWholesaler } from '../firebase'
 import Modal from '../components/Modal'
+import PhoneInput from '../components/PhoneInput'
+import { useLanguage, validatePhone } from '../i18n'
 
 const EMPTY = { name:'', phone:'', amount:'', scheduleType:'weekly',
                 payDay:'1', payDate:'', notes:'' }
@@ -16,6 +18,7 @@ const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','
 export default function Wholesalers() {
   const { wholesalers } = useApp()
   const showToast = useToast()
+  const { t } = useLanguage()
 
   const [showModal,    setShowModal]    = useState(false)
   const [form,         setForm]         = useState(EMPTY)
@@ -63,7 +66,9 @@ export default function Wholesalers() {
   }
 
   async function handleSave() {
-    if (!form.name.trim()) { showToast('⚠️ Enter wholesaler name', 'warning'); return }
+    if (!form.name.trim()) { showToast('Enter wholesaler name', 'warning'); return }
+    const phoneCheck = validatePhone(form.phone)
+    if (form.phone && !phoneCheck.valid) { showToast('Invalid phone number (must be 10 digits, starts with 6-9)', 'error'); return }
     setSaving(true)
     try {
       const data = {
@@ -223,9 +228,12 @@ export default function Wholesalers() {
             <input value={form.name} onChange={e => setForm({...form, name: e.target.value})}
               placeholder="e.g. Sharma Medical" className="field-input" />
           </Field>
-          <Field label="Phone / फोन">
-            <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
-              placeholder="9876543210" className="field-input" />
+          <Field label="">
+            <PhoneInput
+              value={form.phone}
+              onChange={val => setForm({...form, phone: val})}
+              label="Phone / फोन (WhatsApp)"
+            />
           </Field>
           <Field label="Amount Due ₹ / बकाया">
             <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})}

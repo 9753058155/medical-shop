@@ -15,11 +15,14 @@ import { addUdhaar, updateUdhaar,
          deleteUdhaar, listenUdhaar,
          generateWhatsAppBill }                  from '../firebase'
 import Modal                                     from '../components/Modal'
+import PhoneInput                                from '../components/PhoneInput'
+import { useLanguage, validatePhone }             from '../i18n'
 
 const EMPTY = { customerName:'', phone:'', amount:'', notes:'', items:'' }
 
 export default function Udhaar() {
   const showToast = useToast()
+  const { t } = useLanguage()
   const [udhaarList, setUdhaarList] = useState([])
   const [showModal,  setShowModal]  = useState(false)
   const [form,       setForm]       = useState(EMPTY)
@@ -70,6 +73,8 @@ export default function Udhaar() {
 
   async function handleSave() {
     if (!form.customerName.trim()) { showToast('Enter customer name', 'warning'); return }
+    const phoneCheck = validatePhone(form.phone)
+    if (form.phone && !phoneCheck.valid) { showToast('Invalid phone number (must be 10 digits, starts with 6-9)', 'error'); return }
     if (!form.amount)              { showToast('Enter amount', 'warning'); return }
     setSaving(true)
     try {
@@ -295,10 +300,12 @@ export default function Udhaar() {
               onChange={e => setForm({...form, customerName: e.target.value})}
               placeholder="e.g. Ramesh ji" className="field-input"/>
           </Field>
-          <Field label="Phone / फोन (for WhatsApp reminder)">
-            <input type="tel" value={form.phone}
-              onChange={e => setForm({...form, phone: e.target.value})}
-              placeholder="9876543210" className="field-input"/>
+          <Field label="">
+            <PhoneInput
+              value={form.phone}
+              onChange={val => setForm({...form, phone: val})}
+              label="Phone / फोन (WhatsApp reminder)"
+            />
           </Field>
           <Field label="Amount / राशि (Rs.) *">
             <input type="number" value={form.amount}

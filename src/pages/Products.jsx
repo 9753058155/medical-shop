@@ -1,15 +1,19 @@
 /*
   Products.jsx — Add, edit, search, delete medicines
-  Features: autocomplete search, strip/tablet tracking, real-time sync
+  v3.0 — Clean rewrite fixing all unclosed tag issues
+  Features: autocomplete search, strip/tablet tracking,
+            expiry date (iPhone-friendly dropdowns),
+            real-time sync, language support
 */
 
 import React, { useState, useMemo, useRef } from 'react'
-import { useApp, useToast } from '../App'
-import { addProduct, updateProduct, deleteProduct, formatStock, stockStatus, expiryStatus, daysUntilExpiry } from '../firebase'
-import Modal from '../components/Modal'
-import StockBadge from '../components/StockBadge'
+import { useApp, useToast }                  from '../App'
+import { addProduct, updateProduct,
+         deleteProduct, formatStock,
+         stockStatus }                       from '../firebase'
+import Modal                                 from '../components/Modal'
+import StockBadge                            from '../components/StockBadge'
 
-// Empty form state
 const EMPTY_FORM = {
   name: '', category: 'Tablet / गोली', unit: 'tablet',
   perStrip: '', stripsToAdd: '', stock: '',
@@ -23,29 +27,28 @@ export default function Products() {
 
   const [showModal,  setShowModal]  = useState(false)
   const [form,       setForm]       = useState(EMPTY_FORM)
-  const [editId,     setEditId]     = useState(null)   // null = adding new
-  const [filter,     setFilter]     = useState('all')  // 'all' | 'low' | 'out'
+  const [editId,     setEditId]     = useState(null)
+  const [filter,     setFilter]     = useState('all')
   const [search,     setSearch]     = useState('')
   const [saving,     setSaving]     = useState(false)
 
-  // Autocomplete state
-  const [acQuery,    setAcQuery]    = useState('')
-  const [acResults,  setAcResults]  = useState([])
-  const [acOpen,     setAcOpen]     = useState(false)
-  const acRef = useRef(null)
+  // Autocomplete
+  const [acQuery,   setAcQuery]   = useState('')
+  const [acResults, setAcResults] = useState([])
+  const [acOpen,    setAcOpen]    = useState(false)
 
-  // ── Derived: filtered product list ──
+  const isTabletUnit = form.unit === 'tablet' || form.unit === 'capsule'
+
+  // ── Filtered product list ──
   const filtered = useMemo(() => {
     return products.filter(p => {
-      const matchQ = p.name.toLowerCase().includes(search.toLowerCase()) ||
-                     (p.category || '').toLowerCase().includes(search.toLowerCase())
-      const status = stockStatus(p)
-      const matchF = filter === 'all' || filter === status
+      const matchQ  = p.name.toLowerCase().includes(search.toLowerCase()) ||
+                      (p.category||'').toLowerCase().includes(search.toLowerCase())
+      const status  = stockStatus(p)
+      const matchF  = filter === 'all' || filter === status
       return matchQ && matchF
     })
   }, [products, search, filter])
-
-  const isTabletUnit = form.unit === 'tablet' || form.unit === 'capsule'
 
   // ── Open ADD modal ──
   function openAdd() {
@@ -59,35 +62,36 @@ export default function Products() {
   // ── Open EDIT modal ──
   function openEdit(product) {
     setForm({
-      name:            product.name         || '',
-      category:        product.category     || 'Tablet / गोली',
-      unit:            product.unit         || 'tablet',
-      perStrip:        product.perStrip     || '',
-      stripsToAdd:     '',   // always blank — user enters what to ADD
-      stock:           '',   // same
-      lowAlert:        product.lowAlert     || '',
-      buyPrice:        product.buyPrice     || '',
-      sellPrice:       product.sellPrice    || '',
-      wholesalerId:    product.wholesalerId || '',
-      expiryDate:      product.expiryDate || '',
-      wholesalerName:  product.wholesalerName || '',
+      name:           product.name          || '',
+      category:       product.category      || 'Tablet / गोली',
+      unit:           product.unit          || 'tablet',
+      perStrip:       product.perStrip      || '',
+      stripsToAdd:    '',
+      stock:          '',
+      lowAlert:       product.lowAlert      || '',
+      buyPrice:       product.buyPrice      || '',
+      sellPrice:      product.sellPrice     || '',
+      wholesalerId:   product.wholesalerId  || '',
+      wholesalerName: product.wholesalerName|| '',
+      expiryDate:     product.expiryDate    || '',
     })
     setEditId(product.id)
     setAcQuery('')
     setShowModal(true)
   }
 
-  // ── Autocomplete: filter products by typed name ──
+  // ── Autocomplete ──
   function handleAcInput(val) {
     setAcQuery(val)
     if (val.trim().length < 1) { setAcResults([]); setAcOpen(false); return }
-    const matches = products.filter(p => p.name.toLowerCase().includes(val.toLowerCase())).slice(0, 8)
+    const matches = products.filter(p =>
+      p.name.toLowerCase().includes(val.toLowerCase())
+    ).slice(0, 8)
     setAcResults(matches)
     setAcOpen(matches.length > 0)
   }
 
-  // ── User picks a product from autocomplete ──
-  function selectProduct(product) {
+  function selectFromAc(product) {
     setForm({
       name:           product.name          || '',
       category:       product.category      || 'Tablet / गोली',
@@ -99,7 +103,8 @@ export default function Products() {
       buyPrice:       product.buyPrice      || '',
       sellPrice:      product.sellPrice     || '',
       wholesalerId:   product.wholesalerId  || '',
-      wholesalerName: product.wholesalerName || '',
+      wholesalerName: product.wholesalerName|| '',
+      expiryDate:     product.expiryDate    || '',
     })
     setEditId(product.id)
     setAcQuery(product.name)
@@ -107,19 +112,16 @@ export default function Products() {
     showToast(`📦 ${product.name} selected — enter stock to add`)
   }
 
-  // ── Save product to Firebase ──
+  // ── Save product ──
   async function handleSave() {
-    if (!form.name.trim()) { showToast('⚠️ Enter medicine name', 'error'); return }
+    if (!form.name.trim()) { showToast('Enter medicine name', 'error'); return }
     setSaving(true)
-
     try {
-      const w      = wholesalers.find(x => x.id === form.wholesalerId)
-      const isTab  = form.unit === 'tablet' || form.unit === 'capsule'
+      const w        = wholesalers.find(x => x.id === form.wholesalerId)
       const perStrip = parseInt(form.perStrip) || 1
+      let   stockToAdd = 0
 
-      // Calculate how many units to ADD
-      let stockToAdd = 0
-      if (isTab) {
+      if (isTabletUnit) {
         stockToAdd = Math.round((parseFloat(form.stripsToAdd) || 0) * perStrip)
       } else {
         stockToAdd = parseInt(form.stock) || 0
@@ -129,21 +131,22 @@ export default function Products() {
         name:           form.name.trim(),
         category:       form.category,
         unit:           form.unit,
-        perStrip:       isTab ? perStrip : 1,
-        lowAlert:       parseInt(form.lowAlert) || (isTab ? 20 : 5),
+        perStrip:       isTabletUnit ? perStrip : 1,
+        lowAlert:       parseInt(form.lowAlert) || (isTabletUnit ? 20 : 5),
         buyPrice:       parseFloat(form.buyPrice)  || 0,
         sellPrice:      parseFloat(form.sellPrice) || 0,
         wholesalerId:   form.wholesalerId  || '',
         wholesalerName: w ? w.name : '',
-        expiryDate:     form.expiryDate || '',
+        expiryDate:     form.expiryDate    || '',
       }
 
       if (editId) {
-        // Get current stock and ADD to it
         const existing = products.find(p => p.id === editId)
         data.stock = (existing?.stock || 0) + stockToAdd
         await updateProduct(editId, data)
-        showToast(stockToAdd > 0 ? `✅ Stock updated! +${stockToAdd} ${isTab ? 'tablets' : 'units'}` : '✅ Product updated!')
+        showToast(stockToAdd > 0
+          ? `✅ Stock updated! +${stockToAdd} ${isTabletUnit ? 'tablets' : 'units'}`
+          : '✅ Product updated!')
       } else {
         data.stock = stockToAdd
         await addProduct(data)
@@ -152,7 +155,7 @@ export default function Products() {
 
       setShowModal(false)
     } catch (err) {
-      showToast('❌ Error saving: ' + err.message, 'error')
+      showToast('Error: ' + err.message, 'error')
     } finally {
       setSaving(false)
     }
@@ -161,26 +164,36 @@ export default function Products() {
   // ── Delete product ──
   async function handleDelete(id) {
     if (!confirm('Delete this product?')) return
-    try {
-      await deleteProduct(id)
-      showToast('🗑️ Product deleted')
-    } catch (e) {
-      showToast('❌ Error deleting', 'error')
-    }
+    try { await deleteProduct(id); showToast('🗑️ Deleted') }
+    catch (e) { showToast('Error deleting', 'error') }
   }
 
+  // ── Expiry date helpers ──
+  const expiryMonth = form.expiryDate ? (form.expiryDate.split('/')[0] || '') : ''
+  const expiryYear  = form.expiryDate ? (form.expiryDate.split('/')[1] || '') : ''
+
+  function setExpiryMonth(month) {
+    setForm({ ...form, expiryDate: `${month}/${expiryYear}` })
+  }
+  function setExpiryYear(year) {
+    const y = year.replace(/\D/g, '').slice(0, 4)
+    setForm({ ...form, expiryDate: `${expiryMonth}/${y}` })
+  }
+
+  // ── Render ──
   return (
     <div className="page-enter">
 
-      {/* ── HEADER ── */}
+      {/* HEADER */}
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white px-5 pt-12 pb-6">
         <h1 className="text-2xl font-extrabold">Products 📦</h1>
         <p className="text-blue-200 text-sm mt-1">उत्पाद — {products.length} total</p>
       </div>
 
+      {/* CONTENT */}
       <div className="px-4 pt-4 space-y-3">
 
-        {/* ── ADD BUTTON ── */}
+        {/* Add button */}
         <button
           onClick={openAdd}
           className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98]
@@ -190,7 +203,7 @@ export default function Products() {
           ➕ Add / Update Product
         </button>
 
-        {/* ── SEARCH ── */}
+        {/* Search */}
         <div className="relative">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
           <input
@@ -203,30 +216,27 @@ export default function Products() {
           />
         </div>
 
-        {/* ── FILTER PILLS ── */}
+        {/* Filter pills */}
         <div className="flex gap-2">
           {[
-            { key: 'all', label: 'All',         cls: 'bg-blue-600 text-white' },
-            { key: 'low', label: '⚠️ Low',       cls: 'bg-amber-100 text-amber-700' },
-            { key: 'out', label: '🚫 Out',       cls: 'bg-red-100 text-red-700' },
+            { key:'all', label:'All',    cls:'bg-blue-600 text-white'         },
+            { key:'low', label:'⚠️ Low', cls:'bg-amber-100 text-amber-700'    },
+            { key:'out', label:'🚫 Out', cls:'bg-red-100 text-red-700'        },
           ].map(f => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
+            <button key={f.key} onClick={() => setFilter(f.key)}
               className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all
-                ${filter === f.key ? f.cls : 'bg-slate-100 text-slate-500'}`}
-            >
+                ${filter === f.key ? f.cls : 'bg-slate-100 text-slate-500'}`}>
               {f.label}
             </button>
           ))}
         </div>
 
-        {/* ── PRODUCT LIST ── */}
+        {/* Product list */}
         {filtered.length === 0 ? (
           <div className="text-center py-16 text-slate-400">
             <div className="text-4xl mb-3">💊</div>
             <p className="font-medium">No products found</p>
-            <p className="text-sm mt-1">Tap "Add Product" to get started</p>
+            <p className="text-sm mt-1">Tap "Add / Update Product" to get started</p>
           </div>
         ) : (
           filtered.map(p => {
@@ -236,7 +246,6 @@ export default function Products() {
               <div key={p.id}
                 className="bg-white rounded-2xl shadow-sm border border-slate-100
                            flex items-stretch overflow-hidden">
-                {/* Colored left bar */}
                 <div className={`w-1 ${leftBar} flex-shrink-0`} />
                 <div className="flex-1 p-4">
                   <div className="flex justify-between items-start gap-2">
@@ -246,6 +255,7 @@ export default function Products() {
                         {p.category}
                         {p.sellPrice ? ` · ₹${p.sellPrice}/${p.unit}` : ''}
                         {p.wholesalerName ? ` · 🏪 ${p.wholesalerName}` : ''}
+                        {p.expiryDate ? ` · Exp: ${p.expiryDate}` : ''}
                       </p>
                       <p className="text-sm font-semibold text-slate-700 mt-2">
                         📦 {formatStock(p)}
@@ -254,16 +264,16 @@ export default function Products() {
                     <div className="flex flex-col items-end gap-2">
                       <StockBadge product={p} showCount={false} />
                       <div className="flex gap-1.5">
-                        <button
-                          onClick={() => openEdit(p)}
+                        <button onClick={() => openEdit(p)}
                           className="px-3 py-1 bg-slate-100 hover:bg-slate-200
-                                     text-slate-600 rounded-lg text-xs font-semibold transition-colors"
-                        >✏️ Edit</button>
-                        <button
-                          onClick={() => handleDelete(p.id)}
+                                     text-slate-600 rounded-lg text-xs font-semibold">
+                          ✏️ Edit
+                        </button>
+                        <button onClick={() => handleDelete(p.id)}
                           className="px-3 py-1 bg-red-50 hover:bg-red-100
-                                     text-red-600 rounded-lg text-xs font-semibold transition-colors"
-                        >🗑️</button>
+                                     text-red-600 rounded-lg text-xs font-semibold">
+                          🗑️
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -272,9 +282,11 @@ export default function Products() {
             )
           })
         )}
-      </div>
 
-      {/* ── ADD/EDIT MODAL ── */}
+      </div>{/* end CONTENT */}
+
+
+      {/* ADD/EDIT MODAL */}
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
@@ -282,8 +294,8 @@ export default function Products() {
       >
         <div className="space-y-4 pb-4">
 
-          {/* AUTOCOMPLETE SEARCH */}
-          <div className="relative" ref={acRef}>
+          {/* Autocomplete search */}
+          <div className="relative">
             <label className="field-label">Search Existing / मौजूदा खोजें</label>
             <input
               value={acQuery}
@@ -292,38 +304,41 @@ export default function Products() {
               placeholder="Type to search existing products..."
               className="field-input"
             />
-            {/* Dropdown */}
             {acOpen && (
               <div className="absolute z-10 left-0 right-0 top-full mt-1
                               bg-white border border-blue-200 rounded-xl shadow-xl
                               max-h-48 overflow-y-auto">
                 {acResults.map(p => (
-                  <div
-                    key={p.id}
-                    onClick={() => selectProduct(p)}
-                    className="px-4 py-3 cursor-pointer hover:bg-blue-50 border-b border-slate-50 last:border-0"
-                  >
+                  <div key={p.id} onClick={() => selectFromAc(p)}
+                    className="px-4 py-3 cursor-pointer hover:bg-blue-50
+                               border-b border-slate-50 last:border-0">
                     <p className="font-semibold text-sm text-slate-800">{p.name}</p>
-                    <p className="text-xs text-slate-400">{p.category} · Stock: {formatStock(p)}</p>
+                    <p className="text-xs text-slate-400">{p.category} · {formatStock(p)}</p>
                   </div>
                 ))}
               </div>
             )}
-            <p className="text-xs text-slate-400 mt-1">💡 Select to update stock, or fill below to add new</p>
+            <p className="text-xs text-slate-400 mt-1">
+              💡 Select to update stock, or fill below to add new
+            </p>
           </div>
 
-          {/* NAME */}
+          {/* Name */}
           <div>
             <label className="field-label">Medicine Name *</label>
-            <input value={form.name} onChange={e => setForm({...form, name: e.target.value})}
-              placeholder="e.g. Paracetamol 500mg" className="field-input" />
+            <input value={form.name}
+              onChange={e => setForm({...form, name: e.target.value})}
+              placeholder="e.g. Paracetamol 500mg"
+              className="field-input" />
           </div>
 
-          {/* CATEGORY + UNIT */}
+          {/* Category + Unit */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="field-label">Category</label>
-              <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="field-input">
+              <select value={form.category}
+                onChange={e => setForm({...form, category: e.target.value})}
+                className="field-input">
                 <option>Tablet / गोली</option>
                 <option>Capsule / कैप्सूल</option>
                 <option>Syrup / सिरप</option>
@@ -336,7 +351,9 @@ export default function Products() {
             </div>
             <div>
               <label className="field-label">Sell Unit</label>
-              <select value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="field-input">
+              <select value={form.unit}
+                onChange={e => setForm({...form, unit: e.target.value})}
+                className="field-input">
                 <option value="tablet">Tablet</option>
                 <option value="capsule">Capsule</option>
                 <option value="bottle">Bottle</option>
@@ -347,10 +364,12 @@ export default function Products() {
             </div>
           </div>
 
-          {/* STRIP SETTINGS — only for tablet/capsule */}
+          {/* Strip settings — only for tablet/capsule */}
           {isTabletUnit ? (
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
-              <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">📦 Strip Settings</p>
+              <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">
+                📦 Strip Settings
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="field-label">Tablets per Strip *</label>
@@ -394,7 +413,7 @@ export default function Products() {
             </div>
           )}
 
-          {/* PRICES */}
+          {/* Prices */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="field-label">Buy Price ₹</label>
@@ -410,91 +429,84 @@ export default function Products() {
             </div>
           </div>
 
-
-          {/* EXPIRY DATE
-              Two dropdowns: Month + Year
-              Works perfectly on iPhone 15 — no distortion.
-              Month is a <select>, Year is a number input.
-              Stored as "MM/YYYY" string e.g. "03/2026"
+          {/*
+            EXPIRY DATE — iPhone 15 friendly
+            Two separate controls instead of type="month":
+            - Month: <select> dropdown (works perfectly on all devices)
+            - Year: number input with numeric keyboard
+            Stored as "MM/YYYY" string e.g. "03/2026"
           */}
           <div>
-            <label className="field-label">
-              Expiry Date / समाप्ति तिथि
-            </label>
-            <div style={{display:'flex', gap:'8px'}}>
-
-              {/* Month dropdown — clean native picker on all devices */}
+            <label className="field-label">Expiry Date / समाप्ति तिथि</label>
+            <div className="grid grid-cols-2 gap-3">
               <select
-                value={form.expiryDate ? (form.expiryDate.split('/')[0] || '') : ''}
-                onChange={e => {
-                  const month = e.target.value
-                  const year  = form.expiryDate ? (form.expiryDate.split('/')[1] || '') : ''
-                  setForm({...form, expiryDate: month || year ? `${month}/${year}` : ''})
-                }}
+                value={expiryMonth}
+                onChange={e => setExpiryMonth(e.target.value)}
                 className="field-input"
-                style={{flex: 1}}
               >
-                <option value="">Month</option>
-                <option value="01">01 - Jan</option>
-                <option value="02">02 - Feb</option>
-                <option value="03">03 - Mar</option>
-                <option value="04">04 - Apr</option>
-                <option value="05">05 - May</option>
-                <option value="06">06 - Jun</option>
-                <option value="07">07 - Jul</option>
-                <option value="08">08 - Aug</option>
-                <option value="09">09 - Sep</option>
-                <option value="10">10 - Oct</option>
-                <option value="11">11 - Nov</option>
-                <option value="12">12 - Dec</option>
+                <option value="">Month / महीना</option>
+                <option value="01">01 — Jan</option>
+                <option value="02">02 — Feb</option>
+                <option value="03">03 — Mar</option>
+                <option value="04">04 — Apr</option>
+                <option value="05">05 — May</option>
+                <option value="06">06 — Jun</option>
+                <option value="07">07 — Jul</option>
+                <option value="08">08 — Aug</option>
+                <option value="09">09 — Sep</option>
+                <option value="10">10 — Oct</option>
+                <option value="11">11 — Nov</option>
+                <option value="12">12 — Dec</option>
               </select>
-
-              {/* Year input — numeric keyboard on mobile */}
               <input
                 type="number"
-                value={form.expiryDate ? (form.expiryDate.split('/')[1] || '') : ''}
-                onChange={e => {
-                  const year  = e.target.value.replace(/\D/g,'').slice(0,4)
-                  const month = form.expiryDate ? (form.expiryDate.split('/')[0] || '') : ''
-                  setForm({...form, expiryDate: `${month}/${year}`})
-                }}
+                value={expiryYear}
+                onChange={e => setExpiryYear(e.target.value)}
                 placeholder="2026"
+                min="2024"
+                max="2035"
                 inputMode="numeric"
                 className="field-input"
-                style={{flex: 1}}
               />
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Leave blank if no expiry date
-            </p>
+            <p className="text-xs text-slate-400 mt-1">Leave blank if no expiry date</p>
           </div>
 
-          {/* WHOLESALER */}
+          {/* Wholesaler */}
           <div>
             <label className="field-label">Wholesaler</label>
             <select value={form.wholesalerId}
               onChange={e => setForm({...form, wholesalerId: e.target.value})}
               className="field-input">
               <option value="">-- Select --</option>
-              {wholesalers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              {wholesalers.map(w => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
             </select>
           </div>
 
-          {/* SAVE BUTTON */}
-          {saving ? '⏳ Saving...' : '💾 Save Product'}
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl
+                       disabled:opacity-50 transition-all active:scale-[0.98]"
+          >
+            {saving ? '⏳ Saving...' : '💾 Save Product'}
           </button>
+
         </div>
       </Modal>
 
-      {/* Inline styles for form fields */}
       <style>{`
         .field-label { display:block; font-size:0.72rem; font-weight:700;
                        color:#64748b; margin-bottom:4px; letter-spacing:0.2px; }
         .field-input { width:100%; padding:10px 12px; border:1.5px solid #e2e8f0;
                        border-radius:10px; font-size:0.875rem; outline:none;
-                       transition:border-color 0.2s; }
+                       transition:border-color 0.2s; background:white; }
         .field-input:focus { border-color:#3b82f6; box-shadow:0 0 0 3px #dbeafe; }
       `}</style>
+
     </div>
   )
 }

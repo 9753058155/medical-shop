@@ -14,7 +14,8 @@ import Udhaar      from './pages/Udhaar'
 import Reorder     from './pages/Reorder'
 import Purchase    from './pages/Purchase'
 import Returns     from './pages/Returns'
-import Profit      from './pages/Profit'
+import Profit          from './pages/Profit'
+import WholesalerBill  from './pages/WholesalerBill'
 
 export const AppContext  = createContext(null)
 export const useApp     = () => useContext(AppContext)
@@ -137,7 +138,8 @@ export default function App() {
                     <Route path="/purchase"    element={<Purchase />} />
                     <Route path="/returns"     element={<Returns />} />
                     <Route path="/profit"      element={<Profit />} />
-                    <Route path="/reports"     element={<Reports />} />
+                    <Route path="/reports"        element={<Reports />} />
+                    <Route path="/wholesaler-bill" element={<WholesalerBill />} />
                   </Routes>
                 )}
               </main>
@@ -175,7 +177,8 @@ function BottomNav({ setAuthed, lang, changeLang }) {
     { to:'/returns',     icon:'🔄', label:'Returns/Refund',  desc:'Customer returned med'  },
     { to:'/profit',      icon:'💰', label:'Profit Report',   desc:'Margin per medicine'    },
     { to:'/reports',     icon:'📈', label:'Sales Reports',   desc:'Daily/monthly summary'  },
-    { to:'/wholesalers', icon:'🏪', label:'Wholesalers',     desc:'Manage wholesalers'     },
+    { to:'/wholesaler-bill', icon:'📋', label:'Wholesaler Bill', desc:'Enter bill, auto-add stock' },
+    { to:'/wholesalers', icon:'🏪', label:'Wholesalers',         desc:'Manage wholesalers'         },
   ]
 
   async function handleLogout() {

@@ -165,10 +165,10 @@ function BottomNav({ setAuthed, lang, changeLang }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   const mainTabs = [
-    { to:'/',         icon:'📊', label:'Home'     },
-    { to:'/products', icon:'📦', label:'Products' },
-    { to:'/sell',     icon:'🛒', label:'Sell',    special:true },
-    { to:'/udhaar',   icon:'💸', label:'Udhaar'  },
+    { to:'/',                icon:'📊', label:'Home'    },
+    { to:'/products',        icon:'📦', label:'Stock'   },
+    { to:'/sell',            icon:'🛒', label:'Sell',   special:true },
+    { to:'/wholesaler-bill', icon:'📋', label:'Bill'    },
   ]
 
   const menuItems = [

@@ -32,8 +32,32 @@ export const SHOP_PIN = '1234'
 
 // ── Auth helpers ──
 export const signInToShop = () => signInAnonymously(auth)
-export const onAuthChange = (cb) => onAuthStateChanged(auth, cb)
 export const signOut      = () => auth.signOut()
+
+// Auto re-authenticate when token expires — permanent fix for permission errors
+// Firebase anonymous auth tokens expire every hour. This silently refreshes them.
+export const onAuthChange = (cb) => {
+  return onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      // User got signed out (token expired, app restarted, etc.)
+      // Check if they were previously PIN-verified — if yes, silently re-auth
+      const wasVerified = localStorage.getItem('ms_last_active')
+      const lastActive  = parseInt(wasVerified || '0')
+      const eightHours  = 8 * 60 * 60 * 1000
+      if (wasVerified && Date.now() - lastActive < eightHours) {
+        // Still within session — silently sign back in
+        try {
+          await signInAnonymously(auth)
+          // onAuthStateChanged will fire again with the new user
+          return
+        } catch (e) {
+          console.error('Auto re-auth failed:', e)
+        }
+      }
+    }
+    cb(user)
+  })
+}
 
 // ── Collections ──
 export const productsCol    = collection(db, 'products')

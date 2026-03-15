@@ -74,13 +74,10 @@ export default function App() {
     return () => events.forEach(e => window.removeEventListener(e, handle))
   }, [authed])
 
-  useEffect(() => {
-    const onHide = async () => {
-      if (document.visibilityState === 'hidden') { await signOut(); localStorage.removeItem(STORAGE_KEY) }
-    }
-    document.addEventListener('visibilitychange', onHide)
-    return () => document.removeEventListener('visibilitychange', onHide)
-  }, [])
+  // NOTE: We removed the visibilitychange sign-out because it was causing
+  // permission errors — when users switched tabs to check invoice numbers etc,
+  // the app signed them out, then Firebase rejected writes.
+  // Auto-logout is still handled by the 8-hour inactivity timer.
 
   function resetInactivityTimer() {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current)

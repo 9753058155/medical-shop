@@ -52,10 +52,19 @@ export const listenProducts = (cb) =>
 // ── Sales ──
 export const addSale = (data) => addDoc(salesCol, { ...data, createdAt: serverTimestamp() })
 export const listenTodaySales = (cb) => {
-  const start = new Date(); start.setHours(0,0,0,0)
+  // Note: Using orderBy only (no where) to avoid needing a composite Firestore index.
+  // We filter today's sales in JavaScript instead.
   return onSnapshot(
-    query(salesCol, where('createdAt', '>=', start), orderBy('createdAt', 'desc')),
-    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    query(salesCol, orderBy('createdAt', 'desc')),
+    snap => {
+      const today = new Date(); today.setHours(0,0,0,0)
+      const all   = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const todayOnly = all.filter(s => {
+        const d = s.createdAt?.toDate?.() || new Date(s.date || 0)
+        return d >= today
+      })
+      cb(todayOnly)
+    })
 }
 export const listenAllSales = (cb) =>
   onSnapshot(query(salesCol, orderBy('createdAt', 'desc')), snap =>

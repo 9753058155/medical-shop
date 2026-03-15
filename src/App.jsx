@@ -115,12 +115,19 @@ export default function App() {
 
   useEffect(() => {
     if (!authed) return
-    const u1 = listenProducts(data    => { setProducts(data); setLoading(false) })
+    // Set loading=false after 5 seconds max — prevents infinite loading screen
+    const loadingTimeout = setTimeout(() => setLoading(false), 5000)
+
+    const u1 = listenProducts(data => {
+      setProducts(data)
+      setLoading(false)           // normal path — data loaded
+      clearTimeout(loadingTimeout)
+    })
     const u2 = listenWholesalers(data => setWholesalers(data))
     const u3 = listenTodaySales(data  => setTodaySales(data))
     const u4 = listenUdhaar(data      => setUdhaarList(data))
-    const u5 = listenAllSales(data => setAllSales(data))
-    return () => { u1(); u2(); u3(); u4(); u5() }
+    const u5 = listenAllSales(data    => setAllSales(data))
+    return () => { clearTimeout(loadingTimeout); u1(); u2(); u3(); u4(); u5() }
   }, [authed])
 
   const showToast = (msg, type='success') => {

@@ -446,8 +446,6 @@ export default function Sell() {
                     {/* WhatsApp bill button */}
                     <button
                       onClick={() => openWhatsAppBill(s, s.customerPhone)}
-                    <button
-                      onClick={() => openWhatsAppBill(s, s.customerPhone)}
                       className="flex-1 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-bold">
                       📱 WhatsApp Bill
                     </button>
